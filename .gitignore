@@ -1,0 +1,5 @@
+# mostly regarding shell
+
+.idea/
+*.txt
+cmake-*
