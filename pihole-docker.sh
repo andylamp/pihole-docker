@@ -63,6 +63,7 @@ declare -a DNS_IP_ARRAY=(
 )
 
 PI_HOLE_DOCKER_PROJ_NAME="pihole-docker"
+PI_HOLE_DOCKER_CONT_NAME="pihole"
 PI_HOLE_DOCKERFILE="./pihole.yaml"
 
 PI_HOLE_TZ="Europe/Athens"
@@ -172,7 +173,7 @@ version: \"3.7\"
 # More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
 services:
   pihole:
-    container_name: pi-hole
+    container_name: ${PI_HOLE_DOCKER_CONT_NAME}
     image: pihole/pihole:latest
     ports:
       # dns ports

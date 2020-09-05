@@ -22,7 +22,7 @@ version: "3.7"
 # More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
 services:
   pihole:
-    container_name: pi-hole
+    container_name: pihole
     image: pihole/pihole:latest
     ports:
       # dns ports
@@ -87,13 +87,15 @@ use - as such installation will fail; this issue is well documented. To this end
  
 ```bash
 if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; then
-  cli_info "Located resolv.conf with a potential problem; it is mapped to: ${RESOLV_DNS_IP} - trying to fix it. "
+  cli_info "Located resolv.conf with a problem; it is mapped to: ${RESOLV_DNS_IP}"
 
-  if sudo sed -r -i.orig 's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf && \
-     sudo sh -c "rm ${ETC_RESOLV_CONF} && ln -s /run/systemd/resolve/resolv.conf ${ETC_RESOLV_CONF}"; then
+  if sudo sed -r -i.orig \
+     's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf && \
+     sudo sh -c "rm ${ETC_RESOLV_CONF} && \
+     ln -s /run/systemd/resolve/resolv.conf ${ETC_RESOLV_CONF}"; then
     cli_info "resolved config was fixed successfully."
   else
-    cli_error "There was an error while configuring resolved - cannot continue, pihole will probably not work"
+    cli_error "There was an error while configuring resolved - cannot continue"
     exit 1
   fi
 else
