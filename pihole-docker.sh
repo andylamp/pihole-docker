@@ -38,7 +38,7 @@ UFW_SUBNET="${IP_BASE}.0/24"
 UFW_PIHOLE_RULENAME="pihole"
 
 # uninstall flag
-UNINSTALL=true
+UNINSTALL=false
 
 # the resolved related bits
 ETC_RESOLV_CONF="/etc/resolv.conf"
@@ -49,8 +49,9 @@ RESOLV_DNS_IP="127.0.0.53"
 PI_HOLE_BASE="/usr/pihole"
 PI_HOLE_CONF=${PI_HOLE_BASE}/etc-pihole
 PI_HOLE_DNSMASQ_CONF=${PI_HOLE_BASE}/etc-dnsmasq.d
-PI_HOLE_RESOLV_CONF=${PI_HOLE_BASE}/${ETC_RESOLV_CONF}
+PI_HOLE_RESOLV_CONF=${PI_HOLE_BASE}/etc-resolv.conf
 PI_HOLE_LOG=${PI_HOLE_BASE}/pihole.log
+PI_HOLE_FTL_LOG=${PI_HOLE_BASE}/pihole-FTL.log
 
 # ports that the web-interface listens to from localhost (and ufw is configured)
 PI_HOLE_ADMIN_HTTP_PORT=19080
@@ -97,7 +98,7 @@ if [[ ${UNINSTALL} = true ]]; then
   cli_warning "Uninstalling pi-hole and removing all data (note: resolved configuration is _not_ restored)..."
   if docker-compose -p ${PI_HOLE_DOCKER_PROJ_NAME} -f ${PI_HOLE_DOCKERFILE} down &&
      docker container prune -f &&
-     # remove the data stored by grafana and prometheus - you might need to change these
+     # remove the data stored by pi-hole
      sudo rm -rf ${PI_HOLE_BASE}; then
     cli_warning "Uninstallation completed successfully!"
     exit 0
@@ -132,7 +133,16 @@ function print_resolv_conf() {
 if print_resolv_conf; then
     cli_info "Created pi-hole resolv.conf successfully."
 else
-  cli_error "Failed to crate pi-hole resolv.conf - cannot continue"
+  cli_error "Failed to create pi-hole resolv.conf - cannot continue"
+  exit 1
+fi
+
+##### Prepare the logs
+
+if touch ${PI_HOLE_FTL_LOG} && touch ${PI_HOLE_LOG}; then
+  cli_info "Log files for FTL: ${PI_HOLE_FTL_LOG}, pihole: ${PI_HOLE_LOG} created successfully"
+else
+  cli_error "Failed to create log files for FTL and/or pihole - cannot continue"
   exit 1
 fi
 
@@ -181,6 +191,7 @@ services:
       - \"53:53/udp\"
       # ftl (dhcp) ports
       #- \"67:67/udp\"
+      #- \"67:67/udp\"
       #- \"547:547/udp\"
       # ports for http interface
       - \"${PI_HOLE_ADMIN_HTTP_PORT}:80/tcp\"
@@ -194,6 +205,7 @@ services:
       - \"${PI_HOLE_DNSMASQ_CONF}:/etc/dnsmasq.d/\"
       - \"${PI_HOLE_RESOLV_CONF}:/etc/resolv.conf\"
       - \"${PI_HOLE_LOG}:/var/log/pihole.log\"
+      - \"${PI_HOLE_FTL_LOG}:/var/log/pihole-FTL.log\"
     dns:
     $(print_dns_ip)
     # Recommended but not required (DHCP needs NET_ADMIN)
@@ -227,12 +239,12 @@ fi
 ##### Create and register ufw rule for pi-hole
 
 setup_ufw() {
-  # optionally, we can configure ufw to open grafana to our local network.
+  # optionally, we can configure ufw to open pi-hole to our local network.
   if [[ ${UFW_CONF} = true ]]; then
     cli_info "Configuring ufw firewall is enabled - proceeding"
     # output the rule in the ufw application folder - note if rule already exists, skips creation.
-    if [[ -f /etc/ufw/applications.d/${UFW_GRAF_RULENAME} ]]; then
-      cli_warning "ufw grafana rule file already exists - skipping."
+    if [[ -f /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} ]]; then
+      cli_warning "ufw pi-hole rule file already exists - skipping."
     else
         if ! echo -e \
 "[${UFW_PIHOLE_RULENAME}]
@@ -240,10 +252,10 @@ title=pihole
 description=Pi Hole firewall rule
 ports=53/tcp|53/udp|19080/tcp|19443/tcp
 " | sudo tee -a /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} > /dev/null; then
-        cli_error "Failed to output grafana ufw rule successfully - exiting."
+        cli_error "Failed to output pi-hole ufw rule successfully - exiting."
         return 1
       else
-        cli_info "ufw grafana rule file was created successfully!"
+        cli_info "ufw pi-hole rule file was created successfully!"
       fi
     fi
 
