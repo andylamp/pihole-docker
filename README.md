@@ -2,12 +2,13 @@
 
 In my quest for ultimate automation, I needed to update my [pi-hole][1] container image frequently and hassle free.
 Additionally, I also desired that I could use this script to set up a pi-hole container in another location at ease 
-with as little external reading/tooling as possible - i.e. to this fast and through shell.
+with as little external reading/tooling as possible - i.e. be hassle free and run through shell.
 
-To this end, I have created this repo which contains a [script][2] that installs, updates, and removes (if needed) that 
-run with minimal effort on debian based installations and bash where `docker`, `docker-compose` and `curl` are present. 
+To this end, I have created this repo which contains a [script][2] that installs, updates, and removes pi-hole (if needed) that 
+runs with minimal effort on debian based distributions where `docker`, `docker-compose` and `curl` are present. 
+It was developed and tested using `bash`, however other shells might work as well.
 Frankly speaking, this is largely based on the guide provided [here][1], but tailored for my specific purposes 
-and wrapped up in a convenient script that I can run.
+and wrapped up in a convenient script.
 
 # Configuring the image
 
