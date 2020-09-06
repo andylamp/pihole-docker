@@ -71,7 +71,7 @@ PI_HOLE_TZ="Europe/Athens"
 
 # check if we have an environment variable for the password
 if [[ -n ${PI_HOLE_ADMIN_PASS} ]]; then
-  cli_warning "Warning: Potentially using the pre-defined (unsecure) password!"
+  cli_warning "Potentially using the pre-defined (unsecure) password!"
   PI_HOLE_PW="astrongpassword"
 else
   PI_HOLE_PW=${PI_HOLE_ADMIN_PASS}
