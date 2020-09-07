@@ -117,6 +117,8 @@ IP_BASE="10.10.1"
 UFW_SUBNET="${IP_BASE}.0/24"
 ```
 
+Now, the `ufw` configuration function which creates the rule as well as registers it (if needed) follows.
+
 ```bash
 setup_ufw() {
   # optionally, we can configure ufw to open grafana to our local network.
