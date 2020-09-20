@@ -57,10 +57,13 @@ PI_HOLE_FTL_LOG=${PI_HOLE_BASE}/pihole-FTL.log
 PI_HOLE_ADMIN_HTTP_PORT=19080
 PI_HOLE_ADMIN_HTTPS_PORT=19443
 
-# the dns ip array (doesn't have to be ordered!)
+# the dns ip array - ordering here matters.
 declare -a DNS_IP_ARRAY=(
   "127.0.0.1"
   "1.1.1.1"
+  "1.0.0.1"
+  "8.8.8.8"
+  "8.8.4.4"
 )
 
 PI_HOLE_DOCKER_PROJ_NAME="pihole-docker"
