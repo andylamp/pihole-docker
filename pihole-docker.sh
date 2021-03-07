@@ -46,7 +46,7 @@ ETC_RESOLV_CONF="/etc/resolv.conf"
 RESOLV_DNS_IP="127.0.0.53"
 
 # persistence related directories where the volumes will be mounted
-PI_HOLE_BASE="/usr/pihole"
+PI_HOLE_BASE="/gavatha/container-data/pihole"
 PI_HOLE_CONF=${PI_HOLE_BASE}/etc-pihole
 PI_HOLE_DNSMASQ_CONF=${PI_HOLE_BASE}/etc-dnsmasq.d
 PI_HOLE_RESOLV_CONF=${PI_HOLE_BASE}/etc-resolv.conf
