@@ -5,7 +5,7 @@
 #
 # Author: Andreas Grammenos (ag926@cl.cam.ac.uk)
 #
-# Last touched: 06/09/2020
+# Last touched: 12/03/2021
 #
 
 ##### Initialisation and preamble
@@ -28,6 +28,9 @@ else
 fi
 
 ##### Variables and setup
+
+# this is to ensure people are forced to change this (as this is for my setup)
+PI_HOLE_DEFAULT="/gavatha/container-data/pihole"
 
 # configure ufw for pihole flag - only configures it if true
 UFW_CONF=true
@@ -79,6 +82,10 @@ if [[ -z ${PI_HOLE_ADMIN_PASS} ]]; then
 else
   cli_info "Discovered password through a (valid) environment variable"
   PI_HOLE_PW=${PI_HOLE_ADMIN_PASS}
+fi
+
+if [[ ${PI_HOLE_BASE} == "${PI_HOLE_DEFAULT}" ]]; then
+  cli_warning "Seems you have the pre-defined path for PI_HOLE_BASE location: ${PI_HOLE_BASE}, are you sure?"
 fi
 
 # create the volumes based on the user
@@ -165,6 +172,10 @@ if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; t
   if sudo sed -r -i.orig 's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf && \
      sudo sh -c "rm ${ETC_RESOLV_CONF} && ln -s /run/systemd/resolve/resolv.conf ${ETC_RESOLV_CONF}"; then
     cli_info "resolved config was fixed successfully."
+    if ! sudo systemctl stop systemd-resolved; then
+      cli_error "Failed to stop systemd-resolved service - cannot continue"
+      exit 1
+    fi
   else
     cli_error "There was an error while configuring resolved - cannot continue, pihole will probably not work"
     exit 1

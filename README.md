@@ -170,18 +170,18 @@ git clone https://github.com/andylamp/pihole-docker
 # enter this directory
 cd pihole-docker
 # maybe you need to chmod +x
-chmod +x ./pihole-docker.sh
+chmod +x ./pihole-docker
 # then, run the script to install everything
-./pihole-docker.sh
+./pihole-docker
 # alternatively you can use
-./pihole-docker.sh -i
+./pihole-docker -i
 ```
 
 Conversely, to uninstall everything after installation you can do the following:
 
 ```bash
 # assuming you are in the cloned repo directory
-./pihole-docker.sh -r
+./pihole-docker -r
 ```
 
 That's it!
