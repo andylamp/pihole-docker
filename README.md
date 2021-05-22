@@ -73,7 +73,7 @@ PI_HOLE_RESOLV_CONF=${PI_HOLE_BASE}/etc-resolv.conf
 PI_HOLE_LOG=${PI_HOLE_BASE}/pihole.log
 ```
 
-**Note**: please change the web password to something familiar or you are comfortable with - specifically you need to
+**Note**: please change the web password to something familiar, or you are comfortable with - specifically you need to
 change this variable:
 
 ```bash
@@ -189,4 +189,4 @@ Conversely, to uninstall everything after installation you can do the following:
 That's it!
 
 [1]: https://hub.docker.com/r/pihole/pihole/
-[2]: ./pihole-docker.sh
+[2]: ./pihole-docker
