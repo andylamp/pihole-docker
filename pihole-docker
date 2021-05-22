@@ -184,6 +184,7 @@ fi
 ##### Create the pihole yaml file
 
 # nifty little function to print the plug IP's in a tidy way
+# shellcheck disable=SC2120
 function print_dns_ip() {
   if [[ ${#} -eq 0 ]]; then
     echo -e "# IP of your DNS entries"
