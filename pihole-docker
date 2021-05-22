@@ -11,16 +11,16 @@
 ##### Initialisation and preamble
 
 # pretty functions for log output
-function cli_info { echo -e " -- \033[1;32m$1\033[0m" ; }
-function cli_info_read { echo -e -n " -- \e[1;32m$1\e[0m" ; }
-function cli_warning { echo -e " ** \033[1;33m$1\033[0m" ; }
-function cli_warning_read { echo -e -n " ** \e[1;33m$1\e[0m" ; }
-function cli_error { echo -e " !! \033[1;31m$1\033[0m" ; }
+function cli_info { echo -e " -- \033[1;32m$1\033[0m"; }
+function cli_info_read { echo -e -n " -- \e[1;32m$1\e[0m"; }
+function cli_warning { echo -e " ** \033[1;33m$1\033[0m"; }
+function cli_warning_read { echo -e -n " ** \e[1;33m$1\e[0m"; }
+function cli_error { echo -e " !! \033[1;31m$1\033[0m"; }
 
 # check if we have access to docker-compose, jq, and curl
-if [[ ! -x "$(command -v docker-compose)" ]] || \
-[[ ! -x "$(command -v docker)" ]] || \
-[[ ! -x "$(command -v curl)" ]]; then
+if [[ ! -x "$(command -v docker-compose)" ]] ||
+  [[ ! -x "$(command -v docker)" ]] ||
+  [[ ! -x "$(command -v curl)" ]]; then
   cli_error "curl, docker, and docker-compose need to be installed and accessible - cannot continue."
   exit 1
 else
@@ -74,7 +74,16 @@ PI_HOLE_TZ="Europe/Athens"
 
 # check if we have an environment variable for the password
 if [[ -z ${PI_HOLE_ADMIN_PASS} ]]; then
-  cli_warning "Potentially using the pre-defined (unsecure) password!"
+  cli_warning_read "Are you sure want to use the pre-defined (and insecure) password? [y/n]: "
+  read -n 1 -r
+  echo ""
+  if [[ ${REPLY} =~ ^[yY]$ ]] || [[ -z ${REPLY} ]]; then
+    cli_info "\tOK, proceeding!"
+  else
+    cli_warning "\tOK, change the password variable and rerun the script, bye!"
+    exit 0
+  fi
+
   PI_HOLE_PW="astrongpassword"
 else
   cli_info "Discovered password through a (valid) environment variable"
@@ -108,9 +117,9 @@ fi
 if [[ ${UNINSTALL} = true ]]; then
   cli_warning "Uninstalling pi-hole and removing all data (note: resolved configuration is _not_ restored)..."
   if docker-compose -p ${PI_HOLE_DOCKER_PROJ_NAME} -f ${PI_HOLE_DOCKERFILE} down &&
-     docker container prune -f &&
-     # remove the data stored by pi-hole
-     sudo rm -rf ${PI_HOLE_BASE}; then
+    docker container prune -f &&
+    # remove the data stored by pi-hole
+    sudo rm -rf ${PI_HOLE_BASE}; then
     cli_warning "Uninstallation completed successfully!"
     exit 0
   else
@@ -122,9 +131,8 @@ fi
 #### Create the required folders, if not already there.
 
 # create the folders while making the user owner the pihole directory
-if ! ret_val=$(sudo mkdir -p {${PI_HOLE_CONF},${PI_HOLE_DNSMASQ_CONF}} && \
-sudo chown -R "${USER_NAME}":"${USER_NAME}" ${PI_HOLE_BASE});
-then
+if ! ret_val=$(sudo mkdir -p {${PI_HOLE_CONF},${PI_HOLE_DNSMASQ_CONF}} &&
+  sudo chown -R "${USER_NAME}":"${USER_NAME}" ${PI_HOLE_BASE}); then
   cli_error "Could not create pi-hole directories and/or assign permissions - ret val: ${ret_val}."
   exit 1
 else
@@ -135,14 +143,14 @@ fi
 function print_resolv_conf() {
   nameservers=$(printf 'nameserver %s\n' "${DNS_IP_ARRAY[@]}")
   # put it to resolv.conf
-  if ! echo "${nameservers}" > ${PI_HOLE_RESOLV_CONF}; then
+  if ! echo "${nameservers}" >${PI_HOLE_RESOLV_CONF}; then
     return 1
   fi
 }
 
 # now run it.
 if print_resolv_conf; then
-    cli_info "Created pi-hole resolv.conf successfully."
+  cli_info "Created pi-hole resolv.conf successfully."
 else
   cli_error "Failed to create pi-hole resolv.conf - cannot continue"
   exit 1
@@ -162,8 +170,8 @@ fi
 if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; then
   cli_info "Located resolv.conf with a potential problem; it is mapped to: ${RESOLV_DNS_IP} - trying to fix it. "
 
-  if sudo sed -r -i.orig 's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf && \
-     sudo sh -c "rm ${ETC_RESOLV_CONF} && ln -s /run/systemd/resolve/resolv.conf ${ETC_RESOLV_CONF}"; then
+  if sudo sed -r -i.orig 's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf &&
+    sudo sh -c "rm ${ETC_RESOLV_CONF} && ln -s /run/systemd/resolve/resolv.conf ${ETC_RESOLV_CONF}"; then
     cli_info "resolved config was fixed successfully."
   else
     cli_error "There was an error while configuring resolved - cannot continue, pihole will probably not work"
@@ -224,7 +232,7 @@ services:
     cap_add:
       - NET_ADMIN
     restart: unless-stopped
-" > ${PI_HOLE_DOCKERFILE}
+" >${PI_HOLE_DOCKERFILE}
 
 cli_info "Created pi-hole services dockerfile successfully..."
 
@@ -257,12 +265,12 @@ setup_ufw() {
     if [[ -f /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} ]]; then
       cli_warning "ufw pi-hole rule file already exists - skipping."
     else
-        if ! echo -e \
-"[${UFW_PIHOLE_RULENAME}]
+      if ! echo -e \
+        "[${UFW_PIHOLE_RULENAME}]
 title=pihole
 description=Pi Hole firewall rule
 ports=53/tcp|53/udp|19080/tcp|19443/tcp
-" | sudo tee -a /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} > /dev/null; then
+" | sudo tee -a /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} >/dev/null; then
         cli_error "Failed to output pi-hole ufw rule successfully - exiting."
         return 1
       else

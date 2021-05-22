@@ -1,21 +1,23 @@
+![linters](https://github.com/andylamp/pihole-docker/workflows/linter/badge.svg)
+
 # Pi-Hole with docker (hassle-free)
 
-In my quest for ultimate automation, I needed to update my [pi-hole][1] container image frequently and hassle free.
-Additionally, I also desired that I could use this script to set up a pi-hole container in another location at ease 
-with as little external reading/tooling as possible - i.e. be hassle free and run through shell.
+In my quest for ultimate automation, I needed to update my [pi-hole][1] container image frequently and hassle-free.
+Additionally, I also desired that I could use this script to set up a pi-hole container in another location at ease
+with as little external reading/tooling as possible - i.e. be hassle-free and run through shell.
 
-To this end, I have created this repo which contains a [script][2] that installs, updates, and removes pi-hole (if needed) that 
-runs with minimal effort on debian based distributions where `docker`, `docker-compose` and `curl` are present. 
-It was developed and tested using `bash`, however other shells might work as well.
-Frankly speaking, this is largely based on the guide provided [here][1], but tailored for my specific purposes 
-and wrapped up in a convenient script.
+To this end, I have created this repo which contains a [script][2] that installs, updates, and removes pi-hole
+(if needed) that runs with minimal effort on debian based distributions where `docker`, `docker-compose` and `curl`
+are present. It was developed and tested using `bash`, however other shells might work as well. Frankly speaking, this
+is largely based on the guide provided [here][1], but tailored for my specific purposes and wrapped up in a convenient
+script.
 
 # Configuring the image
 
 To start, we need to create the `Dockerfile` that create the pi-hole container; the `yaml` I used which is able to that
 is shown below.
 
-```yaml 
+```yaml
 
 # Generated automatically from pi-hole script
 version: "3.7"
@@ -55,8 +57,8 @@ services:
     restart: unless-stopped
 ```
 
-In my particular use-case I do not require the DHCP server that is provided by pi-hole, hence I opted to not include 
-these ports - specifically, ports `67` and `547` for ipv4 and ipv6 respectively. However, I did want to have a 
+In my particular use-case I do not require the DHCP server that is provided by pi-hole, hence I opted to not include
+these ports - specifically, ports `67` and `547` for ipv4 and ipv6 respectively. However, I did want to have a
 web interface hence the `cap_add` includes the `NET_ADMIN` flag as well as the ports `19080` and `19443` for accessing
 pi-hole through `http(s)` - you can edit these ports to suit your own use case if you fancy something else.
 
@@ -80,12 +82,12 @@ PI_HOLE_PW="astrongpassword"
 
 # System resolved service
 
-In some distributions there is already a dns cache stub resolver which is bound on port `53` that pi-hole will try to 
+In some distributions there is already a dns cache stub resolver which is bound on port `53` that pi-hole will try to
 use - as such installation will fail; this issue is well documented. To this end I've created a function that provisions
- the resolved service to disable the dns caching mechanism as well as use the dns resolver to use the one provided by 
- our DHCP. It has to be noted that this is only performed if needed and not every time. The function that performs the 
+ the resolved service to disable the dns caching mechanism as well as use the dns resolver to use the one provided by
+ our DHCP. It has to be noted that this is only performed if needed and not every time. The function that performs the
  steps outlined follows.
- 
+
 ```bash
 if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; then
   cli_info "Located resolv.conf with a problem; it is mapped to: ${RESOLV_DNS_IP}"
@@ -102,12 +104,12 @@ if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; t
 else
   cli_info "resolv.conf appears to be OK - continuing"
 fi
-``` 
+```
 
 # Configuring ufw
 
-In order to make pi-hole accessible to our local network we need to configure `ufw` accordingly, hence - optionally 
-but enabled by default - we can run the following function do perform this for us.
+In order to make pi-hole accessible to our local network we need to configure `ufw` accordingly, hence - optionally but
+enabled by default - we can run the following function do perform this for us.
 
 **Note** for this to work as intended you need to have your IP subnet set by setting this variable:
 
@@ -161,8 +163,8 @@ ports=53/tcp|53/udp|19080/tcp|19443/tcp
 
 # Putting everything together
 
-The full script can be found [here][2] and you can use it to compile, build, and launch pi-hole as a docker service 
-on your own server/machine. Concretely, to run the script you can do the following:
+The full script can be found [here][2] and you can use it to compile, build, and launch pi-hole as a docker service on
+your own server/machine. Concretely, to run the script you can do the following:
 
 ```bash
 # clone this repository
@@ -170,18 +172,18 @@ git clone https://github.com/andylamp/pihole-docker
 # enter this directory
 cd pihole-docker
 # maybe you need to chmod +x
-chmod +x ./pihole-docker.sh
+chmod +x ./pihole-docker
 # then, run the script to install everything
-./pihole-docker.sh
+./pihole-docker
 # alternatively you can use
-./pihole-docker.sh -i
+./pihole-docker -i
 ```
 
 Conversely, to uninstall everything after installation you can do the following:
 
 ```bash
 # assuming you are in the cloned repo directory
-./pihole-docker.sh -r
+./pihole-docker -r
 ```
 
 That's it!
