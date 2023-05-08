@@ -1,17 +1,32 @@
 
 # Generated automatically from my pi-hole script
-version: "3.7"
+version: "3.8"
 
 # More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
 services:
+  cloudflared:
+    image: visibilityspots/cloudflared:latest
+    container_name: cloudflared
+    ports:
+      - "5053:5053/udp"
+      - "49312:49312/tcp"
+    # this is for performance reasons
+    network_mode: "host"
+    environment:
+      # this allows dual stack instance, handling both IPv4 and IPv6 queries
+      ADDRESS: ::
+    restart: unless-stopped
   pihole:
-    container_name: pi-hole
+    container_name: pihole
     image: pihole/pihole:latest
+    depends_on:
+      - cloudflared
     ports:
       # dns ports
       - "53:53/tcp"
       - "53:53/udp"
       # ftl (dhcp) ports
+      #- "67:67/udp"
       #- "67:67/udp"
       #- "547:547/udp"
       # ports for http interface
@@ -19,17 +34,23 @@ services:
       - "19443:443/tcp"
     environment:
       TZ: Europe/Athens
-      WEBPASSWORD: astrongpassword
+      WEBPASSWORD: "asdf"
+      FTLCONF_LOCAL_IPV4: 10.10.1.25
+      FTLCONF_LOCAL_IPV6: fd79:71d8:a0b7:0:5043:6018:fb4f:ae38
     # Volumes store your data between container upgrades
     volumes:
-      - "/usr/pihole/etc-pihole:/etc/pihole"
-      - "/usr/pihole/etc-dnsmasq.d:/etc/dnsmasq.d/"
-      - "/usr/pihole/etc-resolv.conf:/etc/resolv.conf"
-      - "/usr/pihole/pihole.log:/var/log/pihole.log"
+      - "/gavatha/container-data/pihole/etc-pihole:/etc/pihole"
+      - "/gavatha/container-data/pihole/etc-dnsmasq.d:/etc/dnsmasq.d/"
+      - "/gavatha/container-data/pihole/etc-resolv.conf:/etc/resolv.conf"
+      - "/gavatha/container-data/pihole/pihole.log:/var/log/pihole.log"
+      - "/gavatha/container-data/pihole/pihole-FTL.log:/var/log/pihole-FTL.log"
+    # IPs of your DNS entries
     dns:
-    # IP of your DNS entries
       - 127.0.0.1
       - 1.1.1.1
+      - 1.0.0.1
+      - 2606:4700:4700::1111
+      - 2606:4700:4700::1001
     # Recommended but not required (DHCP needs NET_ADMIN)
     #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
     cap_add:

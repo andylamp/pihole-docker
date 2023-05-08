@@ -5,8 +5,6 @@
 #
 # Author: Andreas Grammenos (ag926@cl.cam.ac.uk)
 #
-# Last touched: 12/03/2021
-#
 
 ##### Initialisation and preamble
 
@@ -27,21 +25,79 @@ else
   cli_info "curl, docker, and docker-compose appear to be present."
 fi
 
+# parse .env, thanks to https://gist.github.com/judy2k/7656bfe3b322d669ef75364a46327836 thread for the idea, which
+# includes a modification to ensure the file ends at a newline and all lines are read correctly.
+
+function export_envs() {
+  local env_file=${1:-.env}
+  local is_comment='^[[:space:]]*#'
+  local is_blank='^[[:space:]]*$'
+  echo "trying env file: ${env_file}"
+
+  # ensure it has a newline that the end, if it does not already
+  tail_line=$(tail -n 1 "${env_file}")
+  if [[ "${tail_line}" != "" ]]; then
+    cli_warning "No Newline at end of ${env_file}, appending!"
+    echo "" >>"${env_file}"
+  fi
+
+  while IFS= read -r line; do
+    [[ $line =~ $is_comment ]] && continue
+    [[ $line =~ $is_blank ]] && continue
+    key=$(echo "$line" | cut -d '=' -f 1)
+    # shellcheck disable=SC2034
+    value=$(echo "$line" | cut -d '=' -f 2-)
+    # shellcheck disable=SC2116,SC1083
+    # echo "The key: ${key} and value: ${value}"
+    eval "export ${key}=\"$(echo \${value})\""
+  done < <(cat "${env_file}")
+}
+
+# handy function which tokenizes a csv formatted line into its respective values
+function tokenize_csv() {
+  # echo "Tokenize: ${1}"
+
+  # check the number of arguments, if it's something else than two,
+  # use the default mapping
+  if [[ ${#} != 2 ]]; then
+    template="%s\n"
+  else
+    template="${2}"
+  fi
+
+  # echo "Template is '${template}'"
+
+  IFS=","
+  read -ra line <<<"${1}"
+  for token in "${line[@]}"; do
+    # we need to disable this directive, as we want the format to be a variable.
+    # shellcheck disable=SC2059
+    printf "${template}" "${token}"
+  done
+}
+
+# parse the .env file
+export_envs pihole.env
+
 ##### Variables and setup
-
-# this is to ensure people are forced to change this (as this is for my setup)
-PI_HOLE_DEFAULT="/gavatha/container-data/pihole"
-
-# configure ufw for pihole flag - only configures it if true
-UFW_CONF=true
-# the local subnet - please configure accordingly
-IP_BASE="10.10.1"
-UFW_SUBNET="${IP_BASE}.0/24"
-# the rule name
-UFW_PIHOLE_RULENAME="pihole"
 
 # uninstall flag
 UNINSTALL=false
+
+# configure ufw for pihole flag - only configures it if true
+# the local subnet - please configure accordingly
+
+if [[ -z "${UFW_IP_BASE}" ]]; then
+  UFW_IP_BASE="10.10.1"
+  cli_warning "Value for the base IPv4 subnet base was not set, using default: ${UFW_IP_BASE}"
+fi
+
+UFW_SUBNET="${UFW_IP_BASE}.0/24"
+
+if [[ -z "${UFW_PIHOLE_RULENAME}" ]]; then
+  UFW_PIHOLE_RULENAME="pihole"
+  cli_warning "Value for UFW pihole rule name was not set, using default: ${UFW_PIHOLE_RULENAME}"
+fi
 
 # the resolved related bits
 ETC_RESOLV_CONF="/etc/resolv.conf"
@@ -49,7 +105,11 @@ ETC_RESOLV_CONF="/etc/resolv.conf"
 RESOLV_DNS_IP="127.0.0.53"
 
 # persistence related directories where the volumes will be mounted
-PI_HOLE_BASE="/gavatha/container-data/pihole"
+if [[ -z ${PI_HOLE_BASE} ]]; then
+  cli_error "The variable PI_HOLE_BASE must be set to the target base directory, cannot continue."
+  exit 1
+fi
+
 PI_HOLE_CONF=${PI_HOLE_BASE}/etc-pihole
 PI_HOLE_DNSMASQ_CONF=${PI_HOLE_BASE}/etc-dnsmasq.d
 PI_HOLE_RESOLV_CONF=${PI_HOLE_BASE}/etc-resolv.conf
@@ -57,44 +117,54 @@ PI_HOLE_LOG=${PI_HOLE_BASE}/pihole.log
 PI_HOLE_FTL_LOG=${PI_HOLE_BASE}/pihole-FTL.log
 
 # ports that the web-interface listens to from localhost (and ufw is configured)
-PI_HOLE_ADMIN_HTTP_PORT=19080
-PI_HOLE_ADMIN_HTTPS_PORT=19443
-
-# the dns ip array - ordering here matters.
-declare -a DNS_IP_ARRAY=(
-  "127.0.0.1"
-  "1.1.1.1"
-  "1.0.0.1"
-  "8.8.8.8"
-  "8.8.4.4"
-)
-
-PI_HOLE_DOCKER_PROJ_NAME="pihole-docker"
-PI_HOLE_DOCKER_CONT_NAME="pihole"
-PI_HOLE_DOCKERFILE="./pihole.yaml"
-
-PI_HOLE_TZ="Europe/Athens"
-
-# check if we have an environment variable for the password
-if [[ -z ${PI_HOLE_ADMIN_PASS} ]]; then
-  cli_warning_read "Are you sure want to use the pre-defined (and insecure) password? [y/n]: "
-  read -n 1 -r
-  echo ""
-  if [[ ${REPLY} =~ ^[yY]$ ]] || [[ -z ${REPLY} ]]; then
-    cli_info "\tOK, proceeding!"
-  else
-    cli_warning "\tOK, change the password variable and rerun the script, bye!"
-    exit 0
-  fi
-
-  PI_HOLE_PW="astrongpassword"
-else
-  cli_info "Discovered password through a (valid) environment variable"
-  PI_HOLE_PW=${PI_HOLE_ADMIN_PASS}
+if [[ -z "${PI_HOLE_ADMIN_HTTP_PORT}" ]]; then
+  PI_HOLE_ADMIN_HTTP_PORT=19080
+  cli_warning "The admin http port for the interface was not set, using default one: ${PI_HOLE_ADMIN_HTTP_PORT}"
 fi
 
-if [[ ${PI_HOLE_BASE} == "${PI_HOLE_DEFAULT}" ]]; then
-  cli_warning "Seems you have the pre-defined path for PI_HOLE_BASE location: ${PI_HOLE_BASE}, are you sure?"
+if [[ -z "${PI_HOLE_ADMIN_HTTPS_PORT}" ]]; then
+  PI_HOLE_ADMIN_HTTPS_PORT=19443
+  cli_warning "The admin https port for the interface was not set, using default one: ${PI_HOLE_ADMIN_HTTPS_PORT}"
+fi
+
+cli_info "Port values for admin interface, http: ${PI_HOLE_ADMIN_HTTP_PORT}, https: ${PI_HOLE_ADMIN_HTTPS_PORT}"
+
+if [[ -z "${PI_HOLE_DNS_IPV4}" ]]; then
+  PI_HOLE_DNS_IPV4="127.0.0.1,1.1.1.1,1.0.0.1"
+  cli_warning "IPv4 DNS are missing, using defaults: ${PI_HOLE_DNS_IPV4}"
+fi
+
+if [[ -z "${PI_HOLE_DNS_IPV6}" ]]; then
+  PI_HOLE_DNS_IPV6="2606:4700:4700::1111,2606:4700:4700::1001"
+  cli_warning "IPv6 DNS are missing, using defaults: ${PI_HOLE_DNS_IPV6}"
+fi
+
+if [[ -z "${PI_HOLE_TZ}" ]]; then
+  PI_HOLE_TZ="Europe/London"
+  cli_warning "There was no timezone supplied, using default value which is: ${PI_HOLE_TZ}"
+else
+  cli_info "Timezone for pihole container is: ${PI_HOLE_TZ}"
+fi
+
+if [[ -z "${PI_HOLE_DOCKER_COMPOSE}" ]]; then
+  PI_HOLE_DOCKER_COMPOSE="./pihole.yaml"
+  cli_warning "docker compose filename was not set, using default: ${PI_HOLE_DOCKER_COMPOSE}"
+else
+  cli_info "Using docker compose filename: ${PI_HOLE_DOCKER_COMPOSE}"
+fi
+
+if [[ -z "${PI_HOLE_DOCKER_PROJ_NAME}" ]]; then
+  PI_HOLE_DOCKER_PROJ_NAME="pihole-docker"
+  cli_warning "Pihole project name was not set, using default: ${PI_HOLE_DOCKER_PROJ_NAME}"
+else
+  cli_info "Using pihole docker project name: ${PI_HOLE_DOCKER_PROJ_NAME}"
+fi
+
+if [[ -z "${PI_HOLE_DOCKER_CONT_NAME}" ]]; then
+  PI_HOLE_DOCKER_CONT_NAME="pihole"
+  cli_warning "Pihole docker container name was not set, using default: ${PI_HOLE_DOCKER_CONT_NAME}"
+else
+  cli_info "Using pihole docker container name: ${PI_HOLE_DOCKER_CONT_NAME}"
 fi
 
 # create the volumes based on the user
@@ -119,14 +189,36 @@ else
   exit 1
 fi
 
+##### Ensure we have a password
+
+# check if we have an environment variable for the password
+if [[ -z ${PI_HOLE_ADMIN_PASS} ]] && [[ "${UNINSTALL}" != true ]]; then
+  cli_error "You need to set the password in the .env file variable named PI_HOLE_ADMIN_PASS - cannot continue..."
+  exit 1
+else
+  cli_info "Discovered password through a (valid) environment variable"
+  PI_HOLE_PW=${PI_HOLE_ADMIN_PASS}
+fi
+
 ##### Check if we need to uninstall
 
-if [[ ${UNINSTALL} = true ]]; then
+if [[ "${UNINSTALL}" = true ]]; then
   cli_warning "Uninstalling pi-hole and removing all data (note: resolved configuration is _not_ restored)..."
-  if docker-compose -p ${PI_HOLE_DOCKER_PROJ_NAME} -f ${PI_HOLE_DOCKERFILE} down &&
+
+  cli_warning_read "We will now delete the following directory: ${PI_HOLE_BASE} - are you sure? [y/n]: "
+  read -n 1 -r
+  echo ""
+  if [[ ${REPLY} =~ ^[yY]$ ]] || [[ -z ${REPLY} ]]; then
+    cli_info "\tOK, proceeding!"
+  else
+    cli_warning "\tOK, aborting execution!"
+    exit 0
+  fi
+
+  if docker-compose -p "${PI_HOLE_DOCKER_PROJ_NAME}" -f "${PI_HOLE_DOCKER_COMPOSE}" down &&
     docker container prune -f &&
     # remove the data stored by pi-hole
-    sudo rm -rf ${PI_HOLE_BASE}; then
+    sudo rm -rf "${PI_HOLE_BASE}"; then
     cli_warning "Uninstallation completed successfully!"
     exit 0
   else
@@ -138,8 +230,8 @@ fi
 #### Create the required folders, if not already there.
 
 # create the folders while making the user owner the pihole directory
-if ! ret_val=$(sudo mkdir -p {${PI_HOLE_CONF},${PI_HOLE_DNSMASQ_CONF}} &&
-  sudo chown -R "${USER_NAME}":"${USER_NAME}" ${PI_HOLE_BASE}); then
+if ! ret_val=$(sudo mkdir -p {"${PI_HOLE_CONF}","${PI_HOLE_DNSMASQ_CONF}"} &&
+  sudo chown -R "${USER_NAME}":"${USER_NAME}" "${PI_HOLE_BASE}"); then
   cli_error "Could not create pi-hole directories and/or assign permissions - ret val: ${ret_val}."
   exit 1
 else
@@ -148,11 +240,19 @@ fi
 
 # function that prints the resolv.conf for pi-hole
 function print_resolv_conf() {
-  nameservers=$(printf 'nameserver %s\n' "${DNS_IP_ARRAY[@]}")
-  # put it to resolv.conf
-  if ! echo "${nameservers}" >${PI_HOLE_RESOLV_CONF}; then
+  # the printing template to use
+  template="nameserver %s\n"
+
+  # put ipv4 dns entries it to resolv.conf
+  if ! tokenize_csv "${PI_HOLE_DNS_IPV4}" "${template}" >"${PI_HOLE_RESOLV_CONF}"; then
     return 1
   fi
+
+  # put ipv6 dns entries to the resolv.conf
+  if ! tokenize_csv "${PI_HOLE_DNS_IPV6}" "${template}" >>"${PI_HOLE_RESOLV_CONF}"; then
+    return 1
+  fi
+
 }
 
 # now run it.
@@ -165,7 +265,7 @@ fi
 
 ##### Prepare the logs
 
-if touch ${PI_HOLE_FTL_LOG} && touch ${PI_HOLE_LOG}; then
+if touch "${PI_HOLE_FTL_LOG}" && touch "${PI_HOLE_LOG}"; then
   cli_info "Log files for FTL: ${PI_HOLE_FTL_LOG}, pihole: ${PI_HOLE_LOG} created successfully"
 else
   cli_error "Failed to create log files for FTL and/or pihole - cannot continue"
@@ -194,28 +294,44 @@ fi
 
 ##### Create the pihole yaml file
 
-# nifty little function to print the plug IP's in a tidy way
+# nifty little function to print the plug IPs in a tidy way
 # shellcheck disable=SC2120
 function print_dns_ip() {
-  if [[ ${#} -eq 0 ]]; then
-    echo -e "# IP of your DNS entries"
-  else
-    echo -e "The DNS IP's supplied are the following:"
-  fi
-  printf '      - %s\n' "${DNS_IP_ARRAY[@]}"
+  echo -e "# IPs of your DNS entries"
+  echo "    dns:"
+
+  # do for ipv4
+  tokenize_csv "${PI_HOLE_DNS_IPV4}" "      - %s\n"
+
+  # do for ipv6
+  tokenize_csv "${PI_HOLE_DNS_IPV6}" "      - %s\n"
 }
 
 cli_info "Creating pi-hole services dockerfile..."
 
 echo -e "
 # Generated automatically from my pi-hole script
-version: \"3.7\"
+version: \"3.8\"
 
 # More info at https://github.com/pi-hole/docker-pi-hole/ and https://docs.pi-hole.net/
 services:
+  cloudflared:
+    image: visibilityspots/cloudflared:latest
+    container_name: cloudflared
+    ports:
+      - \"5053:5053/udp\"
+      - \"49312:49312/tcp\"
+    # this is for performance reasons
+    network_mode: \"host\"
+    environment:
+      # this allows dual stack instance, handling both IPv4 and IPv6 queries
+      ADDRESS: ::
+    restart: unless-stopped
   pihole:
     container_name: ${PI_HOLE_DOCKER_CONT_NAME}
     image: pihole/pihole:latest
+    depends_on:
+      - cloudflared
     ports:
       # dns ports
       - \"53:53/tcp\"
@@ -230,6 +346,8 @@ services:
     environment:
       TZ: ${PI_HOLE_TZ}
       WEBPASSWORD: ${PI_HOLE_PW}
+      FTLCONF_LOCAL_IPV4: ${PI_HOLE_LOCAL_IPV4}
+      FTLCONF_LOCAL_IPV6: ${PI_HOLE_LOCAL_IPV6}
     # Volumes store your data between container upgrades
     volumes:
       - \"${PI_HOLE_CONF}:/etc/pihole\"
@@ -237,20 +355,19 @@ services:
       - \"${PI_HOLE_RESOLV_CONF}:/etc/resolv.conf\"
       - \"${PI_HOLE_LOG}:/var/log/pihole.log\"
       - \"${PI_HOLE_FTL_LOG}:/var/log/pihole-FTL.log\"
-    dns:
     $(print_dns_ip)
     # Recommended but not required (DHCP needs NET_ADMIN)
     #   https://github.com/pi-hole/docker-pi-hole#note-on-capabilities
     cap_add:
       - NET_ADMIN
     restart: unless-stopped
-" >${PI_HOLE_DOCKERFILE}
+" >"${PI_HOLE_DOCKER_COMPOSE}"
 
 cli_info "Created pi-hole services dockerfile successfully..."
 
 ##### Pull images
 
-if ! docker-compose -f ${PI_HOLE_DOCKERFILE} pull; then
+if ! docker-compose -f "${PI_HOLE_DOCKER_COMPOSE}" pull; then
   cli_error "Failed to pull the required docker images - please ensure network connectivity"
   exit 1
 else
@@ -260,7 +377,7 @@ fi
 ##### Create the services
 
 # now execute the docker-compose using our newly created yaml
-if ! docker-compose -p ${PI_HOLE_DOCKER_PROJ_NAME} -f ./${PI_HOLE_DOCKERFILE} up -d --force-recreate; then
+if ! docker-compose -p "${PI_HOLE_DOCKER_PROJ_NAME}" -f ./"${PI_HOLE_DOCKER_COMPOSE}" up -d --force-recreate; then
   cli_error "Could not create pi-hole docker service, exiting."
   exit 1
 else
@@ -270,44 +387,53 @@ fi
 ##### Create and register ufw rule for pi-hole
 
 setup_ufw() {
-  # optionally, we can configure ufw to open pi-hole to our local network.
-  if [[ ${UFW_CONF} = true ]]; then
-    cli_info "Configuring ufw firewall is enabled - proceeding"
-    # output the rule in the ufw application folder - note if rule already exists, skips creation.
-    if [[ -f /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} ]]; then
-      cli_warning "ufw pi-hole rule file already exists - skipping."
-    else
-      if ! echo -e \
-        "[${UFW_PIHOLE_RULENAME}]
+  # optionally, we can configure ufw to open pi-hole to our local network - but first, check if UFW is available.
+  if [[ -z $(type -P "ufw") ]]; then
+    cli_error "ufw was not found, skipping ufw parameterisation..."
+    return 0
+  fi
+
+  # in case ufw was found and the flag is up continue
+  if [[ "${UFW_CONF}" != true ]]; then
+    cli_warning "ufw configuration not enabled, skipping..."
+    return 0
+  fi
+
+  cli_info "Configuring ufw firewall is enabled - proceeding"
+  # output the rule in the ufw application folder - note if rule already exists, skips creation.
+  if [[ -f /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} ]]; then
+    cli_warning "ufw pi-hole rule file already exists - skipping."
+  else
+    if ! echo -e \
+      "[${UFW_PIHOLE_RULENAME}]
 title=pihole
 description=Pi Hole firewall rule
 ports=53/tcp|53/udp|19080/tcp|19443/tcp
 " | sudo tee -a /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} >/dev/null; then
-        cli_error "Failed to output pi-hole ufw rule successfully - exiting."
-        return 1
-      else
-        cli_info "ufw pi-hole rule file was created successfully!"
-      fi
-    fi
-
-    # now configure the ufw rule
-    if [[ "$(sudo ufw status)" == "Status: inactive" ]]; then
-      cli_warning "ufw is inactive we are not adding the rule in it for now."
-    elif ! sudo ufw status verbose | grep -q ${UFW_PIHOLE_RULENAME}; then
-      cli_info "ufw rule seems to be missing - trying to add!"
-      if ! sudo ufw allow from ${UFW_SUBNET} to any app ${UFW_PIHOLE_RULENAME}; then
-        cli_error "Failed to configure ufw rule - exiting!"
-        return 1
-      else
-        cli_info "ufw pi-hole rule was applied successfully!"
-      fi
+      cli_error "Failed to output pi-hole ufw rule successfully - exiting."
+      return 1
     else
-      cli_warning "ufw pi-hole rule seems to be registered already - skipping!"
+      cli_info "ufw pi-hole rule file was created successfully!"
     fi
+  fi
+
+  # now configure the ufw rule
+  if [[ "$(sudo ufw status)" == "Status: inactive" ]]; then
+    cli_warning "ufw is inactive we are not adding the rule in it for now."
+  elif ! sudo ufw status verbose | grep -q ${UFW_PIHOLE_RULENAME}; then
+    cli_info "ufw rule seems to be missing - trying to add!"
+    if ! sudo ufw allow from ${UFW_SUBNET} to any app ${UFW_PIHOLE_RULENAME}; then
+      cli_error "Failed to configure ufw rule - exiting!"
+      return 1
+    else
+      cli_info "ufw pi-hole rule was applied successfully!"
+    fi
+  else
+    cli_warning "ufw pi-hole rule seems to be registered already - skipping!"
   fi
 }
 
-# call thw wrapper function to setup ufw
+# call the wrapper function to setup ufw
 if setup_ufw; then
   cli_info "Configured ufw successfully"
 else
