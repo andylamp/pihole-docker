@@ -5,6 +5,7 @@
 #
 # Author: Andreas Grammenos (ag926@cl.cam.ac.uk)
 #
+# shellcheck disable=SC2317
 
 ##### Initialisation and preamble
 
@@ -25,6 +26,9 @@ else
   cli_info "curl, docker, and docker-compose appear to be present."
 fi
 
+# the pihole .env file to use
+PI_HOLE_DOTENV_FILENAME=".pihole.env"
+
 # parse .env, thanks to https://gist.github.com/judy2k/7656bfe3b322d669ef75364a46327836 thread for the idea, which
 # includes a modification to ensure the file ends at a newline and all lines are read correctly.
 
@@ -32,7 +36,12 @@ function export_envs() {
   local env_file=${1:-.env}
   local is_comment='^[[:space:]]*#'
   local is_blank='^[[:space:]]*$'
-  echo "trying env file: ${env_file}"
+  cli_info "Attempting to parse .env file: ${env_file}"
+
+  if [[ ! -f "${env_file}" ]]; then
+    cli_error "The target file is not present cannot continue..."
+    exit 1
+  fi
 
   # ensure it has a newline that the end, if it does not already
   tail_line=$(tail -n 1 "${env_file}")
@@ -77,7 +86,9 @@ function tokenize_csv() {
 }
 
 # parse the .env file
-export_envs pihole.env
+export_envs ${PI_HOLE_DOTENV_FILENAME}
+
+exit 1
 
 ##### Variables and setup
 
@@ -274,7 +285,7 @@ fi
 
 ##### Prepare the systemd-resolved if needed
 
-if [[ -f ${ETC_RESOLV_CONF} ]] && grep -q ${RESOLV_DNS_IP} ${ETC_RESOLV_CONF}; then
+if [[ -f "${ETC_RESOLV_CONF}" ]] && grep -q "${RESOLV_DNS_IP}" "${ETC_RESOLV_CONF}"; then
   cli_info "Located resolv.conf with a potential problem; it is mapped to: ${RESOLV_DNS_IP} - trying to fix it. "
 
   if sudo sed -r -i.orig 's/#?DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf &&
@@ -401,7 +412,7 @@ setup_ufw() {
 
   cli_info "Configuring ufw firewall is enabled - proceeding"
   # output the rule in the ufw application folder - note if rule already exists, skips creation.
-  if [[ -f /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} ]]; then
+  if [[ -f "/etc/ufw/applications.d/${UFW_PIHOLE_RULENAME}" ]]; then
     cli_warning "ufw pi-hole rule file already exists - skipping."
   else
     if ! echo -e \
@@ -409,7 +420,7 @@ setup_ufw() {
 title=pihole
 description=Pi Hole firewall rule
 ports=53/tcp|53/udp|19080/tcp|19443/tcp
-" | sudo tee -a /etc/ufw/applications.d/${UFW_PIHOLE_RULENAME} >/dev/null; then
+" | sudo tee -a "/etc/ufw/applications.d/${UFW_PIHOLE_RULENAME}" >/dev/null; then
       cli_error "Failed to output pi-hole ufw rule successfully - exiting."
       return 1
     else
@@ -420,9 +431,9 @@ ports=53/tcp|53/udp|19080/tcp|19443/tcp
   # now configure the ufw rule
   if [[ "$(sudo ufw status)" == "Status: inactive" ]]; then
     cli_warning "ufw is inactive we are not adding the rule in it for now."
-  elif ! sudo ufw status verbose | grep -q ${UFW_PIHOLE_RULENAME}; then
+  elif ! sudo ufw status verbose | grep -q "${UFW_PIHOLE_RULENAME}"; then
     cli_info "ufw rule seems to be missing - trying to add!"
-    if ! sudo ufw allow from ${UFW_SUBNET} to any app ${UFW_PIHOLE_RULENAME}; then
+    if ! sudo ufw allow from "${UFW_SUBNET}" to any app "${UFW_PIHOLE_RULENAME}"; then
       cli_error "Failed to configure ufw rule - exiting!"
       return 1
     else
