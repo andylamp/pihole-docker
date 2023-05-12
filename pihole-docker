@@ -88,8 +88,6 @@ function tokenize_csv() {
 # parse the .env file
 export_envs ${PIHOLE_DOTENV_FILENAME}
 
-exit 1
-
 ##### Variables and setup
 
 # uninstall flag
