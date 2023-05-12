@@ -156,7 +156,7 @@ else
 fi
 
 if [[ -z "${PIHOLE_DOCKER_COMPOSE_FILENAME}" ]]; then
-  PIHOLE_DOCKER_COMPOSE_FILENAME="./pihole.yaml"
+  PIHOLE_DOCKER_COMPOSE_FILENAME="pihole.yaml"
   cli_warning "docker compose filename was not set, using default: ${PIHOLE_DOCKER_COMPOSE_FILENAME}"
 else
   cli_info "Using docker compose filename: ${PIHOLE_DOCKER_COMPOSE_FILENAME}"
